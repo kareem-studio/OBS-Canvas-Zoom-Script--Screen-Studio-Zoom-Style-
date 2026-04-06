@@ -101,11 +101,6 @@ local hotkey_enable_id = nil
 local win_point = nil
 local x11_lib = nil
 local x11_display = nil
-
-local _settings = nil
-local has_restored_startup = false
-local startup_timer_running = false
-
 local x11_root = nil
 local x11_mouse = nil
 local osx_lib = nil
@@ -346,7 +341,6 @@ function find_zoom_group()
     local scene = obs.obs_scene_from_source(scene_source)
     if scene == nil then
         log("ERROR: Could not get scene from source")
-        obs.obs_source_release(scene_source)
         return
     end
 
@@ -357,7 +351,7 @@ function find_zoom_group()
     if group_sceneitem == nil then
         local all_items = obs.obs_scene_enum_items(scene)
         if all_items then
-            for _, item in ipairs(all_items) do
+            for _, item in pairs(all_items) do
                 local nested_src = obs.obs_sceneitem_get_source(item)
                 if nested_src ~= nil and obs.obs_source_is_scene(nested_src) then
                     local nested_scene = obs.obs_scene_from_source(nested_src)
@@ -395,8 +389,6 @@ function find_zoom_group()
                             "Create a new scene, add '" .. group_name .. "' as a Source in it, and switch to that scene.")
                         has_logged_missing_group = true
                     end
-                    obs.obs_source_release(found_source)
-                    obs.obs_source_release(scene_source)
                     return
                 else
                     -- The source exists as a scene but isn't added to the current scene
@@ -411,8 +403,6 @@ function find_zoom_group()
                             "In your active scene, click + → Scene → select '" .. group_name .. "', then click Refresh Group.")
                         has_logged_missing_group = true
                     end
-                    obs.obs_source_release(found_source)
-                    obs.obs_source_release(scene_source)
                     return
                 end
             elseif is_group then
@@ -423,11 +413,8 @@ function find_zoom_group()
                         "[Canvas Zoom] Group '" .. group_name .. "' exists but isn't in scene '" .. current_scene_name .. "'. Switch to the correct scene.")
                     has_logged_missing_group = true
                 end
-                obs.obs_source_release(found_source)
-                obs.obs_source_release(scene_source)
                 return
             end
-            obs.obs_source_release(found_source)
         end
         if not has_logged_missing_group then
             log("WARNING: '" .. group_name .. "' not found anywhere.\n" ..
@@ -441,7 +428,6 @@ function find_zoom_group()
                 "[Canvas Zoom] '" .. group_name .. "' not found. Use 'Auto Create Zoom Setup' or manually select your background + display capture → Right-click → Group Items → rename to '" .. group_name .. "'")
             has_logged_missing_group = true
         end
-        obs.obs_source_release(scene_source)
         return
     end
 
@@ -460,37 +446,12 @@ function find_zoom_group()
 
     local scale = obs.vec2()
     obs.obs_sceneitem_get_scale(group_sceneitem, scale)
-
-    if not has_restored_startup and _settings ~= nil then
-        local saved_orig_valid = obs.obs_data_get_bool(_settings, "has_saved_orig")
-        if saved_orig_valid then
-            pos.x = obs.obs_data_get_double(_settings, "saved_orig_pos_x")
-            pos.y = obs.obs_data_get_double(_settings, "saved_orig_pos_y")
-            scale.x = obs.obs_data_get_double(_settings, "saved_orig_scale_x")
-            scale.y = obs.obs_data_get_double(_settings, "saved_orig_scale_y")
-            
-            obs.obs_sceneitem_set_pos(group_sceneitem, pos)
-            obs.obs_sceneitem_set_scale(group_sceneitem, scale)
-
-            log("Restored unzoomed transform from previous session!")
-            obs.obs_data_set_bool(_settings, "has_saved_orig", false)
-        end
-        has_restored_startup = true
-    end
-
-    group_pos_orig.x = pos.x
-    group_pos_orig.y = pos.y
-    current_pos.x = pos.x
-    current_pos.y = pos.y
-
     group_scale_orig.x = scale.x
     group_scale_orig.y = scale.y
     current_scale = scale.x  -- assume uniform scale
 
     log("Found group '" .. group_name .. "' at pos (" .. pos.x .. ", " .. pos.y ..
         ") scale (" .. scale.x .. ", " .. scale.y .. ")")
-        
-    obs.obs_source_release(scene_source)
 end
 
 ---------------------------------------------------------------------------
@@ -922,7 +883,7 @@ function on_frontend_event(event)
         log("Scene changed — re-finding group")
         find_zoom_group()
     elseif event == obs.OBS_FRONTEND_EVENT_EXIT then
-        log("OBS exiting — restoring group transform before context invalidates")
+        log("OBS exiting — restoring group transform to prevent saving zoomed state")
         release_group()
     end
 end
@@ -955,14 +916,12 @@ function do_auto_setup()
     
     local scene = obs.obs_scene_from_source(scene_source)
     if not scene then
-        obs.obs_source_release(scene_source)
         return false
     end
 
     local group = obs.obs_scene_find_source(scene, group_name)
     if group then
         obs.script_log(obs.OBS_LOG_INFO, "[Canvas Zoom] Group '" .. group_name .. "' already exists. Setup skipped.")
-        obs.obs_source_release(scene_source)
         return true
     end
 
@@ -982,12 +941,8 @@ function do_auto_setup()
             
             if img_source then
                 obs.obs_scene_add(group_inner_scene, img_source)
-                obs.obs_source_release(img_source)
             end
-            obs.obs_data_release(img_settings)
         end
-        
-        obs.obs_source_release(new_group_source)
         
         obs.script_log(obs.OBS_LOG_INFO, "=========================================")
         obs.script_log(obs.OBS_LOG_INFO, "[Canvas Zoom] Auto Setup Complete!")
@@ -996,7 +951,6 @@ function do_auto_setup()
         obs.script_log(obs.OBS_LOG_INFO, "=========================================")
     end
 
-    obs.obs_source_release(scene_source)
     has_logged_missing_group = false
     find_zoom_group()
     return true
@@ -1109,16 +1063,7 @@ end
 ---------------------------------------------------------------------------
 -- Load
 ---------------------------------------------------------------------------
-function on_startup_timer()
-    obs.timer_remove(on_startup_timer)
-    startup_timer_running = false
-    log("Startup check - finding zoom group and enforcing unzoomed state")
-    find_zoom_group()
-end
-
 function script_load(settings)
-    _settings = settings
-
     -- Register hotkeys
     hotkey_enable_id = obs.obs_hotkey_register_frontend("canvas_enable_toggle", "Toggle canvas script ON/OFF",
         on_toggle_enable)
@@ -1177,20 +1122,14 @@ function script_load(settings)
     -- Transition handlers
     local transitions = obs.obs_frontend_get_transitions()
     if transitions ~= nil then
-        for _, s in ipairs(transitions) do
+        for _, s in pairs(transitions) do
             local handler = obs.obs_source_get_signal_handler(s)
             obs.signal_handler_connect(handler, "transition_start", on_transition_start)
-            obs.obs_source_release(s)
         end
     end
 
     if ffi.os == "Linux" and not x11_display then
         log("ERROR: Could not get X11 Display for Linux")
-    end
-
-    if not startup_timer_running then
-        startup_timer_running = true
-        obs.timer_add(on_startup_timer, 2500)
     end
 end
 
@@ -1198,14 +1137,6 @@ end
 -- Save
 ---------------------------------------------------------------------------
 function script_save(settings)
-    if group_sceneitem ~= nil and group_scale_orig.x ~= 0 then
-        obs.obs_data_set_double(settings, "saved_orig_pos_x", group_pos_orig.x)
-        obs.obs_data_set_double(settings, "saved_orig_pos_y", group_pos_orig.y)
-        obs.obs_data_set_double(settings, "saved_orig_scale_x", group_scale_orig.x)
-        obs.obs_data_set_double(settings, "saved_orig_scale_y", group_scale_orig.y)
-        obs.obs_data_set_bool(settings, "has_saved_orig", true)
-    end
-
     if hotkey_enable_id ~= nil then
         local arr = obs.obs_hotkey_save(hotkey_enable_id)
         obs.obs_data_set_array(settings, "canvas_zoom.hotkey.enable", arr)
@@ -1289,40 +1220,17 @@ function script_unload()
     -- Restore original transform before unload to prevent zoomed state sticking around
     release_group()
 
-    if is_timer_running then
-        obs.timer_remove(on_zoom_timer)
-        is_timer_running = false
-    end
     if click_poll_timer_running then
         obs.timer_remove(on_click_poll_timer)
         click_poll_timer_running = false
-    end
-    if startup_timer_running then
-        obs.timer_remove(on_startup_timer)
-        startup_timer_running = false
     end
 
     zoom_state = ZoomState.None
     is_click_down = false
     click_zoom_unzoom_pending = false
 
-    -- These are unowned/borrowed refs — just nil them, never release.
-    group_sceneitem = nil
-    group_source = nil
-
-    pcall(function()
-        local transitions = obs.obs_frontend_get_transitions()
-        if transitions ~= nil then
-            for _, s in ipairs(transitions) do
-                local handler = obs.obs_source_get_signal_handler(s)
-                obs.signal_handler_disconnect(handler, "transition_start", on_transition_start)
-                obs.obs_source_release(s)
-            end
-        end
-    end)
-
-    -- OBS automatically unregisters hotkeys on unload, doing so manually crashes.
-    pcall(function() obs.obs_frontend_remove_event_callback(on_frontend_event) end)
+    -- OBS automatically cleans up signals and hotkeys. 
+    -- Making C API calls here during shutdown will cause an Access Violation crash.
 
     if x11_lib ~= nil and x11_display ~= nil then
         x11_lib.XCloseDisplay(x11_display)

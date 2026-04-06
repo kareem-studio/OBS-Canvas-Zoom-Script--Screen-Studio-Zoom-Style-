@@ -1,6 +1,6 @@
-# OBS Canvas Zoom (Screen Studio Style)
+# OBS Canvas Zoom (v1.0)
 
-**OBS Canvas Zoom** is a robust, Lua-based scripting plugin for OBS Studio that enables a dynamic, Screen Studio-style zoom effect dynamically at the canvas level. 
+**OBS Canvas Zoom** is a robust, Lua-based scripting plugin for OBS Studio that enables a dynamic, Screen Studio-style zoom effect seamlessly at the canvas level.
 
 Instead of traditional cropping methods that obliterate your framing or cut off backgrounds, this script leverages OBS Group abstractions. It zooms the group encompassing both your display capture and your background image by shifting transform coordinates. This keeps your background beautifully visible and proportionally accurate around the edges while highlighting the exact action under your cursor.
 
@@ -12,7 +12,7 @@ Instead of traditional cropping methods that obliterate your framing or cut off 
     - Full custom parameter tuning over Follow Speed and deadzones (Follow Border percentage).
     - Custom "Edge Padding" ensures your cursor never hits the sheer edge of the frame.
 - **Background Retention:** Automatically keeps designated background textures beautifully in frame during scale transformations.
-- **One-Click Auto-Setup:** Employs OBS 32.x memory-safe source group instantiation to quickly generate the required scene structure with a single click.
+- **One-Click Auto-Setup:** Quickly generates the exact required scene layer hierarchy with a single click inside the script window.
 
 ## 🚀 Installation & Setup
 
@@ -21,24 +21,31 @@ Instead of traditional cropping methods that obliterate your framing or cut off 
 3. In OBS Studio, navigate to **Tools > Scripts**.
 4. Click the **`+`** icon and select `obs-canvas-zoom.lua`.
 5. **Initial Setup:** Look for the **⚡ Auto Create Zoom Setup** button in the script properties configuration panel and click it. 
-6. Drag your target Window/Display capture into the newly generated `ZoomGroup` nested layer, and assign a local image file to the `Background Image` dummy layer.
+6. Drag your target Window/Display capture into the newly generated `ZoomGroup` group folder, and double click the generated `Background Image (Assign Me)` layer to select an image from your computer to use as your background frame.
 
-## 🛠 Script Progress & Technical Architecture
+## 💡 How it Works & Usage
 
-The script relies heavily on FFI implementation bindings to interface directly with OS-layer cursor events (Windows API, Linux X11, macOS NSEvent) for extreme precision cursor tracking, unaffected by the main thread OBS loop speeds.
+- **Activate & Zoom:** Once your captures are in the group, simply start clicking. The script listens natively to OS inputs and dynamically scales your "ZoomGroup" forward, framing exactly what you clicked on.
+- **Hands-Free Following:** Moving your mouse off center naturally pans the camera.
+- **Hotkeys:** You can assign custom Hotkeys (via *OBS Settings > Hotkeys*) to manually override the zoom, toggle the script on and off, or pause the mouse-following logic.
+- **Refresh Flow:** If you make large edits to the scene, add new things to the group, or something feels out of sync, press the **↻ Refresh Group** button to quickly re-sync the system.
 
-### Recent Stabilizations:
-- **OBS 32 Garbage Collection Fixes:** The Lua implementation handles rigorous SWIG wrapping object lifecycles. Handled memory crashes by systematically mapping standard C API callback deletions so that OBS Scene Tear-down sequences do not encounter "double-free" garbage collection overlaps, preventing previously common `obs_sceneitem_release` access violations.
-- **Memory-Safe Auto Generators:** The Auto setup tool safely fetches and delegates `obs_scene` wrappers avoiding ownership corruption inside the backend `obs.dll`.
+## 🔥 Best Recommended Settings
+For the most authentic and smooth "Screen Studio" feel, apply the following baseline settings:
 
-- **Auto-Follow Boundary Clamping:** Modified the edge logic limiters to gracefully clamp cursor tracking coordinates rather than completely dropping out-of-bounds frames, yielding smooth follow movement instead of edge stuttering.
-- **Signal Teardown Stability:** Removed manual transitioning polling from the script exit commands. This allows OBS's native memory manager to handle its own garbage collection smoothly, fixing persistent access violation crashes upon OBS shutdown.
-
-### Roadmap & Enhancements
-- Support for seamlessly shifting the group structure dynamically between various main scenes without having to press `↻ Refresh Group`.
-- Extending the FFI Linux backend for Wayland specific bounds since it currently defaults heavily into X11 architectures.
+- **Zoom Speed:** `0.02`
+- **Edge Padding (%):** `5`
+- **Screen Studio Click Zoom:** `Checked`
+  - Left Click / Right Click / Middle Click: `Checked`
+- **Unzoom Delay (sec):** `2.00`
+- **Min Zoom Duration (sec):** `5.55`
+- **Auto Follow Mouse:** `Checked`
+- **Follow Outside Bounds:** `Unchecked`
+- **Follow Speed:** `0.05`
+- **Follow Border (%):** `50`
+- **Lock Sensitivity:** `1`
+- **Auto Lock on Reverse Direction:** `Unchecked`
 
 ## 📜 License
 
-This project is generously released under the fully permissive **MIT License**. Feel free to branch, modify, implement within commercial productions, or contribute upstream optimizations. 
-See the attached `LICENSE` file for full terms.
+This project is generously released under the fully permissive **MIT License**. Feel free to branch, modify, implement within commercial productions, or contribute upstream optimizations.
