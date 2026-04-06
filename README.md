@@ -1,6 +1,6 @@
-# OBS Canvas Zoom (v1.0)
+# OBS Screen Studio (v1.0)
 
-**OBS Canvas Zoom** is a robust, Lua-based scripting plugin for OBS Studio that enables a dynamic, Screen Studio-style zoom effect seamlessly at the canvas level.
+**OBS Screen Studio** is a robust, Lua-based scripting plugin for OBS Studio that enables a dynamic, Screen Studio-style zoom effect seamlessly at the canvas level.
 
 Instead of traditional cropping methods that obliterate your framing or cut off backgrounds, this script leverages OBS Group abstractions. It zooms the group encompassing both your display capture and your background image by shifting transform coordinates. This keeps your background beautifully visible and proportionally accurate around the edges while highlighting the exact action under your cursor.
 
