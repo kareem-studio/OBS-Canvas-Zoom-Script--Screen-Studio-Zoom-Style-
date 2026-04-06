@@ -653,16 +653,11 @@ function on_zoom_timer()
         if is_following_mouse then
             local t = calculate_zoom_target(zoom_value)
 
-            local skip_frame = false
             if not use_follow_outside_bounds then
-                -- Check if mouse is outside the canvas bounds
-                if t.raw_mouse.x < 0 or t.raw_mouse.x > canvas_w or
-                   t.raw_mouse.y < 0 or t.raw_mouse.y > canvas_h then
-                    skip_frame = true
-                end
+                -- Clamp the target to ensure the mouse tracks smoothly to the canvas edges
+                t.raw_mouse.x = clamp(0, canvas_w, t.raw_mouse.x)
+                t.raw_mouse.y = clamp(0, canvas_h, t.raw_mouse.y)
             end
-
-            if not skip_frame then
                 -- Safe-zone / locked-center logic
                 if locked_center ~= nil then
                     local diff = {
@@ -726,7 +721,6 @@ function on_zoom_timer()
                         end
                     end
                 end
-            end
         end
     end
 
@@ -1239,19 +1233,8 @@ function script_unload()
     group_sceneitem = nil
     group_source = nil
 
-    -- Wrap signal disconnect in pcall — during OBS shutdown the transition
-    -- sources may already be invalid, causing obs_source_release to crash.
-    pcall(function()
-        local transitions = obs.obs_frontend_get_transitions()
-        if transitions ~= nil then
-            for _, s in pairs(transitions) do
-                local handler = obs.obs_source_get_signal_handler(s)
-                obs.signal_handler_disconnect(handler, "transition_start", on_transition_start)
-            end
-            obs.source_list_release(transitions)
-        end
-    end)
-
+    -- OBS automatically unregisters signals and hotkeys on unload. 
+    -- Manual intervention here during obs_shutdown triggers Access Violations.
     pcall(function() obs.obs_frontend_remove_event_callback(on_frontend_event) end)
     pcall(function() obs.obs_hotkey_unregister(hotkey_enable_id) end)
     pcall(function() obs.obs_hotkey_unregister(hotkey_zoom_id) end)

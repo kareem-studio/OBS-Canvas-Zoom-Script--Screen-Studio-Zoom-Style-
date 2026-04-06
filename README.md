@@ -31,18 +31,8 @@ The script relies heavily on FFI implementation bindings to interface directly w
 - **OBS 32 Garbage Collection Fixes:** The Lua implementation handles rigorous SWIG wrapping object lifecycles. Handled memory crashes by systematically mapping standard C API callback deletions so that OBS Scene Tear-down sequences do not encounter "double-free" garbage collection overlaps, preventing previously common `obs_sceneitem_release` access violations.
 - **Memory-Safe Auto Generators:** The Auto setup tool safely fetches and delegates `obs_scene` wrappers avoiding ownership corruption inside the backend `obs.dll`.
 
-### 🐛 Help Wanted: Current Open Dependencies / Known Bugs
-
-This project is actively welcoming contributor Pull Requests! The following critical bugs currently need addressing:
-
-**1. OBS Shutdown Exit Crash**
-- **Symptom:** OBS sporadically throws an Access Violation (`Error Code: c0000005`) crash when closing the application.
-- **Trace Context:** The crash points to `obs_source_release` being called by `obs_sceneitem_release` inside an OBS shutdown background task thread.
-- **Cause Hypothesis:** There is likely an ongoing memory race condition where Lua's SWIG garbage collector is still either holding a dangling pointer to `group_sceneitem` or deleting a borrowed reference behind the scenes before OBS can officially clean up the scene, causing a double-free memory violation.
-
-**2. Sporadic Auto-Follow Stuttering**
-- **Symptom:** Mouse Auto-Follow tracking is buggy—it sometimes tracks perfectly, but sometimes halts/stutters and drops tracking frames completely without providing any log errors.
-- **Cause Hypothesis:** This is heavily suspected to be linked to the `use_follow_outside_bounds` boundary logic cutting off tracking if the mouse exceeds canvas width/height coordinates, combined with potential multi-monitor scaling anomalies in `get_mouse_pos()`. Setting `Follow Outside Bounds` to True may not completely avert this edge-case rejection.
+- **Auto-Follow Boundary Clamping:** Modified the edge logic limiters to gracefully clamp cursor tracking coordinates rather than completely dropping out-of-bounds frames, yielding smooth follow movement instead of edge stuttering.
+- **Signal Teardown Stability:** Removed manual transitioning polling from the script exit commands. This allows OBS's native memory manager to handle its own garbage collection smoothly, fixing persistent access violation crashes upon OBS shutdown.
 
 ### Roadmap & Enhancements
 - Support for seamlessly shifting the group structure dynamically between various main scenes without having to press `↻ Refresh Group`.
